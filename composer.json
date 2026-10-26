@@ -1,6 +1,6 @@
 {
     "name": "dskripchenko/laravel-hybrid-search",
-    "description": "Search for Laravel on PostgreSQL alone: full-text (tsvector, morphology per language) with access filtering in SQL; vector search and hybrid ranking next.",
+    "description": "Search for Laravel on PostgreSQL alone: full-text (tsvector, morphology per language) and vectors (pgvector) fused by Reciprocal Rank Fusion, with access filtering in SQL.",
     "type": "library",
     "license": "MIT",
     "keywords": ["laravel", "search", "postgresql", "full-text", "tsvector", "pgvector", "hybrid-search"],
@@ -8,6 +8,7 @@
     "require": {
         "php": "^8.2",
         "illuminate/database": "^11.0 || ^12.0 || ^13.0",
+        "illuminate/http": "^11.0 || ^12.0 || ^13.0",
         "illuminate/support": "^11.0 || ^12.0 || ^13.0",
         "illuminate/queue": "^11.0 || ^12.0 || ^13.0",
         "illuminate/console": "^11.0 || ^12.0 || ^13.0"

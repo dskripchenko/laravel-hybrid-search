@@ -2,7 +2,9 @@
 <phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" bootstrap="vendor/autoload.php" colors="true">
     <testsuites>
         <testsuite name="hybrid-search">
+            <directory>tests/Unit</directory>
             <directory>tests/Feature</directory>
+            <directory>tests/Vector</directory>
         </testsuite>
     </testsuites>
     <source>

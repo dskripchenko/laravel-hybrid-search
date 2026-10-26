@@ -5,11 +5,18 @@ declare(strict_types=1);
 namespace Dskripchenko\HybridSearch;
 
 use Dskripchenko\HybridSearch\Contracts\Searchable;
+use Dskripchenko\HybridSearch\Vector\ChunkIndexer;
+use Dskripchenko\HybridSearch\Vector\VectorConfig;
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 
-/** Writes documents into the index and takes them out. */
+/**
+ * Writes documents into the index and takes them out. With vector search on,
+ * putting a document also (re)builds its chunks and embeddings — slow, which
+ * is why IndexRecord does it in a queued job; chunks leave with their
+ * document (on delete cascade).
+ */
 final class Indexer
 {
     public function index(Searchable $record): void
@@ -32,6 +39,13 @@ final class Indexer
             'language' => $language,
             'indexed_at' => now(),
         ]], ['type', 'key'], ['title', 'body', 'access_key', 'facets', 'url', 'language', 'indexed_at']);
+
+        if (VectorConfig::enabled()) {
+            $id = $this->db()->table($this->table())->where('type', $document->type)->where('key', $document->key)->value('id');
+            if (is_numeric($id)) {
+                app(ChunkIndexer::class)->sync((int) $id, $document->title, $document->body);
+            }
+        }
     }
 
     public function remove(string $type, string $key): void

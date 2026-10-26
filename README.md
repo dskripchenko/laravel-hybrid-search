@@ -1,11 +1,11 @@
 # dskripchenko/laravel-hybrid-search
 
 Search for Laravel on PostgreSQL alone — no search server to run and keep in
-sync. This release is the full-text half: documents in a `tsvector` with the
-morphology of their language, prefix matching while typing, highlighted
-snippets, facets, and **access filtering inside the SQL** so a query can only
-ever see what the person may see. The vector half (pgvector, hybrid ranking,
-answers with citations) comes next.
+sync. Full-text: documents in a `tsvector` with the morphology of their
+language, prefix matching while typing, highlighted snippets, facets. Vectors:
+Markdown-aware chunks embedded into pgvector, and a hybrid query that fuses
+both by Reciprocal Rank Fusion. Both sides do **access filtering inside the
+SQL**, so a query can only ever see what the person may see.
 
 ## Install
 
@@ -76,11 +76,44 @@ Search::query('доска')->accessKeys($keys)->countsByType();   // ['issue' =>
   key list finds nothing, only `everywhere()` lifts the filter.
 
 `php artisan search:reindex` rebuilds the models listed in
-`hybrid-search.models`. More in [docs/en](docs/en/usage.md).
+`hybrid-search.models`.
+
+## Vector search and hybrid ranking
+
+Needs the [pgvector](https://github.com/pgvector/pgvector) extension in any
+schema on the search_path (e.g. `CREATE EXTENSION vector SCHEMA extensions`
+and `search_path = public, extensions`) and an embeddings endpoint.
+
+```dotenv
+HYBRID_SEARCH_VECTOR=true                                # before `migrate`: creates search_chunks
+HYBRID_SEARCH_VECTOR_DIMENSIONS=1024
+HYBRID_SEARCH_EMBEDDING_URL=http://127.0.0.1:11434/v1    # any OpenAI-compatible /embeddings
+HYBRID_SEARCH_EMBEDDING_MODEL=bge-m3
+HYBRID_SEARCH_EMBEDDING_KEY=                             # bearer token, if any
+```
+
+Indexing a document then also cuts its body into chunks (headings start
+chunks, paragraphs packed to ~1200 characters, code blocks kept whole) and
+embeds them — in the queued job, and only the chunks whose text changed.
+`php artisan hybrid-search:embed {--type=} {--force}` fills in documents
+indexed before.
+
+```php
+$query = Search::query('how are customers kept apart')
+    ->accessKeys($keys)                          // the same fail-closed filter
+    ->hybrid();
+$hits = $query->get();                           // full-text ∪ vectors, fused by RRF
+$query->degraded();                              // null, or why it ran on full-text alone
+```
+
+The package depends on no LLM client: bind your own
+`Dskripchenko\HybridSearch\Contracts\Embedder` to use anything else, and
+`Embedders\FakeEmbedder` in tests. More in [docs/en](docs/en/usage.md).
 
 ## Requirements
 
-PHP 8.2–8.5, Laravel 11–13, PostgreSQL.
+PHP 8.2–8.5, Laravel 11–13, PostgreSQL; pgvector 0.8+ for the vector half
+(0.5+ with `vector.iterative_scan` set to null).
 
 ## License
 

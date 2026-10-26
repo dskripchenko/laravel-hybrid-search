@@ -15,6 +15,7 @@ use Throwable;
 /**
  * PostgreSQL from HYBRID_SEARCH_TEST_DB_* (defaults: 127.0.0.1:5432,
  * hybrid_search_test, postgres). The suite skips when none is reachable.
+ * The search_path includes `extensions`, where VectorTestCase keeps pgvector.
  */
 abstract class TestCase extends Base
 {
@@ -35,7 +36,7 @@ abstract class TestCase extends Base
             'password' => self::env('PASSWORD', ''),
             'charset' => 'utf8',
             'prefix' => '',
-            'search_path' => 'public',
+            'search_path' => 'public, extensions',
             'sslmode' => 'prefer',
         ]);
         $app['config']->set('hybrid-search.queue', false);
@@ -52,7 +53,8 @@ abstract class TestCase extends Base
             $this->markTestSkipped('PostgreSQL is not available: '.$e->getMessage());
         }
 
-        DB::statement('drop table if exists search_documents, notes, migrations cascade');
+        DB::statement('drop table if exists search_chunks, search_documents, notes, migrations cascade');
+        $this->prepareDatabase();
         $this->artisan('migrate')->assertSuccessful();
         Schema::create('notes', function (Blueprint $t): void {
             $t->id();
@@ -64,7 +66,10 @@ abstract class TestCase extends Base
         });
     }
 
-    private static function env(string $key, string $default): string
+    /** Before the migrations run. */
+    protected function prepareDatabase(): void {}
+
+    protected static function env(string $key, string $default): string
     {
         $value = getenv('HYBRID_SEARCH_TEST_DB_'.$key);
 

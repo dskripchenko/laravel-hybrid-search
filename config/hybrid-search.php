@@ -23,9 +23,55 @@ return [
     // Models `search:reindex` walks through.
     'models' => [],
 
-    // Weights of the parts of a document in the rank.
+    // The highlighted fragment of a hit.
     'snippet' => [
         'max_words' => 30,
         'min_words' => 12,
+    ],
+
+    // The vector half: chunks of documents with embeddings in pgvector, and
+    // SearchQuery::hybrid() fusing them with full-text by Reciprocal Rank
+    // Fusion. Needs the `vector` extension reachable through the search_path.
+    'vector' => [
+        // Off by default: the chunks migration and embedding run only when on.
+        'enabled' => env('HYBRID_SEARCH_VECTOR', false),
+
+        'table' => 'search_chunks',
+
+        // The size of the embedding column; must match the embedder (bge-m3
+        // and text-embedding-3-small with dimensions=1024: 1024). HNSW indexes
+        // up to 2000.
+        'dimensions' => env('HYBRID_SEARCH_VECTOR_DIMENSIONS', 1024),
+
+        // Chunking of Markdown bodies: target size and the overlap carried
+        // into the next chunk of the same section, in characters.
+        'chunk_chars' => 1200,
+        'chunk_overlap' => 150,
+
+        // Candidates taken from each side before fusion, and the k of RRF.
+        'candidates' => 50,
+        'rrf_k' => 60,
+
+        // Vector candidates farther than this cosine distance (0 — same
+        // direction, 2 — opposite) are dropped; null keeps the nearest ones
+        // however far. Nearest neighbours always exist, so set it (tuned to
+        // your model) when unrelated documents should not show up.
+        'max_distance' => null,
+
+        // pgvector 0.8+: keep scanning the HNSW graph until enough rows pass
+        // the access filter ('relaxed_order', 'strict_order'); null — off
+        // (older pgvector).
+        'iterative_scan' => 'relaxed_order',
+
+        // The built-in embedder: any OpenAI-compatible /embeddings endpoint
+        // (OpenAI, Ollama's /v1, vLLM, LocalAI…). Bind your own
+        // Contracts\Embedder in the container to replace it.
+        'embedder' => [
+            'url' => env('HYBRID_SEARCH_EMBEDDING_URL', 'http://127.0.0.1:11434/v1'),
+            'model' => env('HYBRID_SEARCH_EMBEDDING_MODEL', 'bge-m3'),
+            'key' => env('HYBRID_SEARCH_EMBEDDING_KEY'),
+            'batch' => 32,
+            'timeout' => 60,
+        ],
     ],
 ];

@@ -4,11 +4,16 @@ declare(strict_types=1);
 
 namespace Dskripchenko\HybridSearch\Query;
 
+use Dskripchenko\HybridSearch\Contracts\Embedder;
 use Dskripchenko\HybridSearch\Hit;
+use Dskripchenko\HybridSearch\Vector\ChunkIndexer;
+use Dskripchenko\HybridSearch\Vector\VectorConfig;
+use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use LogicException;
+use Throwable;
 
 /**
  * A full-text query. Access is part of the SQL: without accessKeys() — or an
@@ -19,6 +24,12 @@ use LogicException;
  * as prefixes of its words, in the russian, english and simple
  * configurations at once, so a constant query keeps the GIN index in use
  * whatever the language of a document. An exact key (GAL-12) ranks first.
+ *
+ * hybrid() adds the vector side: the text is embedded once, the top
+ * candidates of full-text and of cosine distance over chunks — both under the
+ * same access, type and facet filter — are fused by Reciprocal Rank Fusion.
+ * When the embedder fails, the query falls back to full-text and degraded()
+ * says why.
  */
 final class SearchQuery
 {
@@ -32,6 +43,10 @@ final class SearchQuery
     private array $facets = [];
 
     private bool $everywhere = false;
+
+    private bool $hybrid = false;
+
+    private ?string $degraded = null;
 
     private int $limit = 20;
 
@@ -80,9 +95,27 @@ final class SearchQuery
         return $this;
     }
 
+    /** Fuse full-text with vector search (needs `hybrid-search.vector.enabled`). */
+    public function hybrid(bool $hybrid = true): self
+    {
+        $this->hybrid = $hybrid;
+
+        return $this;
+    }
+
+    /**
+     * Why the last hybrid get() ran on full-text alone (the embedder failed,
+     * vector search is off); null — it did not.
+     */
+    public function degraded(): ?string
+    {
+        return $this->degraded;
+    }
+
     /** @return list<Hit> */
     public function get(): array
     {
+        $this->degraded = null;
         if ($this->accessKeys === null) {
             throw new LogicException('A search needs accessKeys() or an explicit everywhere().');
         }
@@ -91,48 +124,11 @@ final class SearchQuery
             return [];
         }
 
-        [$cte, $bindings] = $this->queries($text);
-        [$where, $whereBindings] = $this->conditions();
-        $table = $this->table();
-        $snippet = 'MaxWords='.Config::integer('hybrid-search.snippet.max_words', 30)
-            .',MinWords='.Config::integer('hybrid-search.snippet.min_words', 12)
-            .',ShortWord=2,StartSel=**,StopSel=**,HighlightAll=false';
-
-        $rows = $this->db()->select(
-            "with {$cte}
-             select d.type, d.key, d.title, d.url, d.facets,
-                    ts_headline(d.language, d.body, q.pre, '{$snippet}') as snippet,
-                    ts_rank_cd(d.tsv, q.web) * 2 + ts_rank_cd(d.tsv, q.pre)
-                      + case when lower(d.key) = lower(?) then 10 else 0 end as score
-             from {$table} d, q
-             where (d.tsv @@ q.web or d.tsv @@ q.pre or lower(d.key) = lower(?)) {$where}
-             order by score desc, d.indexed_at desc
-             limit ? offset ?",
-            [...$bindings, $text, $text, ...$whereBindings, $this->limit, $this->offset],
-        );
-
-        $hits = [];
-        foreach ($rows as $row) {
-            $r = (array) $row;
-            $decoded = is_string($r['facets'] ?? null) ? json_decode($r['facets'], true) : [];
-            $facets = [];
-            foreach (is_array($decoded) ? $decoded : [] as $name => $value) {
-                if (is_string($name)) {
-                    $facets[$name] = $value;
-                }
-            }
-            $hits[] = new Hit(
-                type: is_string($r['type'] ?? null) ? $r['type'] : '',
-                key: is_string($r['key'] ?? null) ? $r['key'] : '',
-                title: is_string($r['title'] ?? null) ? $r['title'] : '',
-                snippet: is_string($r['snippet'] ?? null) ? $r['snippet'] : '',
-                url: is_string($r['url'] ?? null) ? $r['url'] : null,
-                score: is_numeric($r['score'] ?? null) ? (float) $r['score'] : 0.0,
-                facets: $facets,
-            );
+        if ($this->hybrid) {
+            return $this->hybridHits($text);
         }
 
-        return $hits;
+        return array_map(fn (array $row): Hit => $this->hit($row), $this->fullText($text, $this->limit, $this->offset));
     }
 
     /**
@@ -171,6 +167,212 @@ final class SearchQuery
         }
 
         return $out;
+    }
+
+    /**
+     * Full-text matches, best first.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function fullText(string $text, int $limit, int $offset): array
+    {
+        [$cte, $bindings] = $this->queries($text);
+        [$where, $whereBindings] = $this->conditions();
+        $table = $this->table();
+        $snippet = 'MaxWords='.Config::integer('hybrid-search.snippet.max_words', 30)
+            .',MinWords='.Config::integer('hybrid-search.snippet.min_words', 12)
+            .',ShortWord=2,StartSel=**,StopSel=**,HighlightAll=false';
+
+        $rows = $this->db()->select(
+            "with {$cte}
+             select d.id, d.type, d.key, d.title, d.url, d.facets,
+                    ts_headline(d.language, d.body, q.pre, '{$snippet}') as snippet,
+                    ts_rank_cd(d.tsv, q.web) * 2 + ts_rank_cd(d.tsv, q.pre)
+                      + case when lower(d.key) = lower(?) then 10 else 0 end as score,
+                    lower(d.key) = lower(?) as exact
+             from {$table} d, q
+             where (d.tsv @@ q.web or d.tsv @@ q.pre or lower(d.key) = lower(?)) {$where}
+             order by score desc, d.indexed_at desc
+             limit ? offset ?",
+            [...$bindings, $text, $text, $text, ...$whereBindings, $limit, $offset],
+        );
+
+        return self::rows($rows);
+    }
+
+    /**
+     * The nearest documents by their best chunk, best first — under the same
+     * filter as full-text, applied inside the scan (pgvector's iterative
+     * scan keeps walking the graph until enough rows pass it).
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function nearest(string $vector, int $limit): array
+    {
+        [$where, $whereBindings] = $this->conditions();
+        $table = $this->table();
+        $chunks = VectorConfig::table();
+        // Several chunks of one document may come first; take more of them.
+        $chunkLimit = $limit * 4;
+        $maxDistance = VectorConfig::maxDistance();
+        $cutoff = $maxDistance === null ? '' : 'where best.distance <= ?';
+        $db = $this->db();
+
+        return $db->transaction(static function () use ($db, $vector, $where, $whereBindings, $table, $chunks, $chunkLimit, $limit, $maxDistance, $cutoff): array {
+            $scan = VectorConfig::iterativeScan();
+            if ($scan !== null) {
+                $db->select("select set_config('hnsw.iterative_scan', ?, true)", [$scan]);
+            }
+            $db->select("select set_config('hnsw.ef_search', ?, true)", [(string) max(40, min(1000, $chunkLimit))]);
+
+            $rows = $db->select(
+                "with n as (
+                     select c.document_id, c.content, c.embedding <=> ?::vector as distance
+                     from {$chunks} c join {$table} d on d.id = c.document_id
+                     where true {$where}
+                     order by c.embedding <=> ?::vector
+                     limit ?
+                 ), best as (
+                     select distinct on (document_id) document_id, content, distance
+                     from n order by document_id, distance
+                 )
+                 select d.id, d.type, d.key, d.title, d.url, d.facets, best.content, best.distance
+                 from best join {$table} d on d.id = best.document_id
+                 {$cutoff}
+                 order by best.distance, d.id
+                 limit ?",
+                [$vector, ...$whereBindings, $vector, $chunkLimit, ...($maxDistance === null ? [] : [$maxDistance]), $limit],
+            );
+
+            return self::rows($rows);
+        });
+    }
+
+    /** @return list<Hit> */
+    private function hybridHits(string $text): array
+    {
+        $vector = $this->embedQuery($text);
+        if ($vector === null) {
+            return array_map(fn (array $row): Hit => $this->hit($row), $this->fullText($text, $this->limit, $this->offset));
+        }
+
+        $candidates = max(VectorConfig::candidates(), $this->offset + $this->limit);
+        $rows = [];
+        $exact = [];
+        $byText = [];
+        foreach ($this->fullText($text, $candidates, 0) as $row) {
+            $id = self::id($row);
+            $rows[$id] = $row;
+            $byText[] = $id;
+            if (($row['exact'] ?? false) === true) {
+                $exact[$id] = true;
+            }
+        }
+        $byMeaning = [];
+        foreach ($this->nearest($vector, $candidates) as $row) {
+            $id = self::id($row);
+            $byMeaning[] = $id;
+            if (! isset($rows[$id])) {
+                $row['snippet'] = $this->trim(is_string($row['content'] ?? null) ? $row['content'] : '');
+                $rows[$id] = $row;
+            }
+        }
+
+        $scores = ReciprocalRankFusion::fuse([$byText, $byMeaning], VectorConfig::rrfK());
+        foreach (array_keys($exact) as $id) {
+            $scores[$id] += 10.0;
+        }
+        $order = array_flip(array_keys($scores));
+        uksort($scores, static fn (int|string $a, int|string $b): int => [$scores[$b], $order[$a]] <=> [$scores[$a], $order[$b]]);
+
+        $hits = [];
+        foreach (array_slice($scores, $this->offset, $this->limit, true) as $id => $score) {
+            $hits[] = $this->hit([...$rows[$id], 'score' => $score]);
+        }
+
+        return $hits;
+    }
+
+    /** The query as a pgvector literal; null — degraded to full-text. */
+    private function embedQuery(string $text): ?string
+    {
+        if (! VectorConfig::enabled()) {
+            $this->degraded = 'Vector search is off (hybrid-search.vector.enabled).';
+
+            return null;
+        }
+        try {
+            $vectors = app(Embedder::class)->embed([$text]);
+            if (count($vectors) !== 1) {
+                throw new LogicException('The embedder returned '.count($vectors).' vectors for one text.');
+            }
+
+            return ChunkIndexer::literal($vectors[0]);
+        } catch (Throwable $e) {
+            $this->degraded = 'The embedder failed: '.$e->getMessage();
+            if (app()->bound(ExceptionHandler::class)) {
+                app(ExceptionHandler::class)->report($e);
+            }
+
+            return null;
+        }
+    }
+
+    /** @param array<string, mixed> $r */
+    private function hit(array $r): Hit
+    {
+        $decoded = is_string($r['facets'] ?? null) ? json_decode($r['facets'], true) : [];
+        $facets = [];
+        foreach (is_array($decoded) ? $decoded : [] as $name => $value) {
+            if (is_string($name)) {
+                $facets[$name] = $value;
+            }
+        }
+
+        return new Hit(
+            type: is_string($r['type'] ?? null) ? $r['type'] : '',
+            key: is_string($r['key'] ?? null) ? $r['key'] : '',
+            title: is_string($r['title'] ?? null) ? $r['title'] : '',
+            snippet: is_string($r['snippet'] ?? null) ? $r['snippet'] : '',
+            url: is_string($r['url'] ?? null) ? $r['url'] : null,
+            score: is_numeric($r['score'] ?? null) ? (float) $r['score'] : 0.0,
+            facets: $facets,
+        );
+    }
+
+    /**
+     * @param  array<mixed>  $rows
+     * @return list<array<string, mixed>>
+     */
+    private static function rows(array $rows): array
+    {
+        $out = [];
+        foreach ($rows as $row) {
+            $r = [];
+            foreach ((array) $row as $column => $value) {
+                if (is_string($column)) {
+                    $r[$column] = $value;
+                }
+            }
+            $out[] = $r;
+        }
+
+        return $out;
+    }
+
+    /** @param array<string, mixed> $row */
+    private static function id(array $row): int
+    {
+        return is_numeric($row['id'] ?? null) ? (int) $row['id'] : 0;
+    }
+
+    /** The first words of a chunk, for a hit found by meaning alone. */
+    private function trim(string $content): string
+    {
+        $words = preg_split('/\s+/u', trim($content), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        $max = Config::integer('hybrid-search.snippet.max_words', 30);
+
+        return implode(' ', array_slice($words, 0, $max)).(count($words) > $max ? ' …' : '');
     }
 
     /** @return array{0: string, 1: list<string>} */

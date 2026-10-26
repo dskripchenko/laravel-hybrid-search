@@ -13,7 +13,8 @@ use Illuminate\Foundation\Bus\Dispatchable;
 
 /**
  * (Re)index one record by class and key, after the transaction that changed
- * it commits; a record gone by then is taken out of the index.
+ * it commits; a record gone by then is taken out of the index. With vector
+ * search on this is also where its chunks are embedded — the slow part.
  */
 final class IndexRecord implements ShouldQueue
 {
