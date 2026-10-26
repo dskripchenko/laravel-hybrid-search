@@ -1,0 +1,9 @@
+parameters:
+    level: max
+    paths:
+        - src
+        - database
+        - config
+    ignoreErrors:
+        # A library trait: the host's models use it.
+        - identifier: trait.unused
