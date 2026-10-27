@@ -1,6 +1,14 @@
 # Changelog
 
-## [Unreleased] — 0.1.0
+All notable changes to this project are documented in this file. The format
+follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the
+project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+## [0.1.0] — 2026-10-27
+
+First public release.
 
 ### Added
 - Full-text search on PostgreSQL: documents with a generated, weighted
@@ -32,3 +40,6 @@
   full-text when the embedder fails and reports it in `degraded()`.
 - `hybrid-search:embed {--type=} {--force}`.
 - The migrations can be published (`hybrid-search-migrations`).
+
+[Unreleased]: https://github.com/dskripchenko/laravel-hybrid-search/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/dskripchenko/laravel-hybrid-search/releases/tag/v0.1.0
