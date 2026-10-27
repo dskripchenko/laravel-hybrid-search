@@ -62,6 +62,35 @@ final class VectorConfig
         return is_string($mode) && $mode !== '' && $mode !== 'off' ? $mode : null;
     }
 
+    /** @return array{text: float, meaning: float} weights of the two rankings in the fusion */
+    public static function weights(): array
+    {
+        $weights = (array) config('hybrid-search.vector.weights', []);
+        $text = $weights['text'] ?? 1.0;
+        $meaning = $weights['meaning'] ?? 1.0;
+
+        return [
+            'text' => is_numeric($text) ? max(0.0, (float) $text) : 1.0,
+            'meaning' => is_numeric($meaning) ? max(0.0, (float) $meaning) : 1.0,
+        ];
+    }
+
+    /** Put before a query when it is embedded (`query: ` for e5, an instruction for others). */
+    public static function queryPrefix(): string
+    {
+        $prefix = config('hybrid-search.vector.embedder.query_prefix');
+
+        return is_string($prefix) ? $prefix : '';
+    }
+
+    /** Put before every chunk when it is embedded (`passage: ` for e5). */
+    public static function documentPrefix(): string
+    {
+        $prefix = config('hybrid-search.vector.embedder.document_prefix');
+
+        return is_string($prefix) ? $prefix : '';
+    }
+
     private static function int(string $key, int $default): int
     {
         $value = config('hybrid-search.vector.'.$key);

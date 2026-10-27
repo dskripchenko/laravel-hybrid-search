@@ -278,7 +278,8 @@ final class SearchQuery
             }
         }
 
-        $scores = ReciprocalRankFusion::fuse([$byText, $byMeaning], VectorConfig::rrfK());
+        $weights = VectorConfig::weights();
+        $scores = ReciprocalRankFusion::fuse([$byText, $byMeaning], VectorConfig::rrfK(), [$weights['text'], $weights['meaning']]);
         foreach (array_keys($exact) as $id) {
             $scores[$id] += 10.0;
         }
@@ -302,7 +303,7 @@ final class SearchQuery
             return null;
         }
         try {
-            $vectors = app(Embedder::class)->embed([$text]);
+            $vectors = app(Embedder::class)->embed([VectorConfig::queryPrefix().$text]);
             if (count($vectors) !== 1) {
                 throw new LogicException('The embedder returned '.count($vectors).' vectors for one text.');
             }

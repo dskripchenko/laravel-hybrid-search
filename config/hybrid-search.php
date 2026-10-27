@@ -52,6 +52,13 @@ return [
         'candidates' => 50,
         'rrf_k' => 60,
 
+        // How much each ranking counts in the fusion. Raise `text` when exact
+        // words (names, codes, keys) should win over related meaning.
+        'weights' => [
+            'text' => env('HYBRID_SEARCH_WEIGHT_TEXT', 1.0),
+            'meaning' => env('HYBRID_SEARCH_WEIGHT_MEANING', 1.0),
+        ],
+
         // Vector candidates farther than this cosine distance (0 — same
         // direction, 2 — opposite) are dropped; null keeps the nearest ones
         // however far. Nearest neighbours always exist, so set it (tuned to
@@ -72,6 +79,11 @@ return [
             'key' => env('HYBRID_SEARCH_EMBEDDING_KEY'),
             'batch' => 32,
             'timeout' => 60,
+            // Some models are trained with prefixes: e5 wants `query: ` and
+            // `passage: `. bge-m3 and OpenAI models want none. A new
+            // document prefix embeds every chunk again on the next sync.
+            'query_prefix' => env('HYBRID_SEARCH_QUERY_PREFIX', ''),
+            'document_prefix' => env('HYBRID_SEARCH_DOCUMENT_PREFIX', ''),
         ],
     ],
 ];

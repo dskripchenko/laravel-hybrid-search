@@ -18,11 +18,13 @@
 | `vector.candidates` | 50 | сколько кандидатов берётся с каждой стороны до слияния |
 | `vector.rrf_k` | 60 | k в Reciprocal Rank Fusion |
 | `vector.max_distance` | null | отбрасывать векторных кандидатов дальше этого косинусного расстояния |
+| `vector.weights.text`, `vector.weights.meaning` | 1, 1 (`HYBRID_SEARCH_WEIGHT_TEXT`, `HYBRID_SEARCH_WEIGHT_MEANING`) | вес каждого из двух списков при слиянии |
 | `vector.iterative_scan` | `relaxed_order` | итеративное сканирование индекса pgvector 0.8+; null на более старом pgvector |
 | `vector.embedder.url` | `http://127.0.0.1:11434/v1` (`HYBRID_SEARCH_EMBEDDING_URL`) | базовый адрес OpenAI-совместимого API |
 | `vector.embedder.model` | `bge-m3` (`HYBRID_SEARCH_EMBEDDING_MODEL`) | |
 | `vector.embedder.key` | null (`HYBRID_SEARCH_EMBEDDING_KEY`) | отправляется как bearer-токен |
 | `vector.embedder.batch`, `vector.embedder.timeout` | 32, 60 | текстов в запросе, секунд на запрос |
+| `vector.embedder.query_prefix`, `vector.embedder.document_prefix` | пусто (`HYBRID_SEARCH_QUERY_PREFIX`, `HYBRID_SEARCH_DOCUMENT_PREFIX`) | ставится перед запросом и фрагментом при векторизации: `query: ` и `passage: ` для e5; bge-m3 и моделям OpenAI не нужен. Новый префикс документов векторизует фрагменты заново |
 
 ## Индекс
 
@@ -107,7 +109,7 @@ $this->app->singleton(Embedder::class, MyEmbedder::class);
 `SearchQuery::hybrid()` один раз получает эмбеддинг запроса и берёт первые
 `candidates` результатов полнотекстового поиска и первые `candidates`
 документов по косинусному расстоянию до их ближайшего чанка, затем сливает два
-списка по Reciprocal Rank Fusion: score = Σ 1 / (`rrf_k` + rank). Точное
+списка по Reciprocal Rank Fusion: score = Σ w / (`rrf_k` + rank), где `w` — из `vector.weights`. Точное
 совпадение ключа добавляет 10, поэтому такой документ по-прежнему первый.
 `Hit` сохраняет свою форму: `score` — слитый балл; сниппет — подсвеченный
 полнотекстовый фрагмент, а для документа, найденного только по смыслу, —

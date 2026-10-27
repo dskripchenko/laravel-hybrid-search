@@ -155,3 +155,33 @@ it('refuses to migrate when pgvector is not on the search_path', function (): vo
         DB::statement('set search_path to public, extensions');
     }
 });
+
+it('puts the configured prefixes before queries and chunks, and embeds again when the document prefix changes', function (): void {
+    config(['hybrid-search.vector.embedder.query_prefix' => 'query: ', 'hybrid-search.vector.embedder.document_prefix' => 'passage: ']);
+    $before = count($this->embedder->embedded);
+
+    Note::query()->findOrFail(2)->update(['body' => 'Sprints.']);
+    Search::query('sprints')->everywhere()->hybrid()->get();
+
+    $new = array_slice($this->embedder->embedded, $before);
+    expect($new)->toBe(["passage: Boards and sprints\n\nSprints.", 'query: sprints']);
+
+    // Unchanged text, new prefix: embedded again on the next sync.
+    config(['hybrid-search.vector.embedder.document_prefix' => 'doc: ']);
+    Note::query()->findOrFail(2)->update(['status' => 'done']);
+    Note::query()->findOrFail(2)->update(['status' => 'open']);
+    expect(end($this->embedder->embedded))->toBe("doc: Boards and sprints\n\nSprints.");
+});
+
+it('lets the weights decide between words and meaning', function (): void {
+    $order = function (float $text, float $meaning): array {
+        config(['hybrid-search.vector.weights' => ['text' => $text, 'meaning' => $meaning]]);
+
+        return hitKeys(Search::query('customer schema')->everywhere()->hybrid()->get());
+    };
+    $byText = hitKeys(Search::query('customer schema')->everywhere()->get());
+
+    // Words alone: the full-text order first, then what only meaning found.
+    expect(array_slice($order(1, 0), 0, count($byText)))->toBe($byText)
+        ->and($order(0, 1))->not->toBe($order(1, 0));
+});

@@ -18,11 +18,13 @@
 | `vector.candidates` | 50 | Kandidaten pro Seite vor der Fusion |
 | `vector.rrf_k` | 60 | das k der Reciprocal Rank Fusion |
 | `vector.max_distance` | null | Vektorkandidaten jenseits dieser Kosinusdistanz verwerfen |
+| `vector.weights.text`, `vector.weights.meaning` | 1, 1 (`HYBRID_SEARCH_WEIGHT_TEXT`, `HYBRID_SEARCH_WEIGHT_MEANING`) | wie stark jede der beiden Ranglisten in die Fusion eingeht |
 | `vector.iterative_scan` | `relaxed_order` | iterative Index-Scans von pgvector 0.8+; null bei älterem pgvector |
 | `vector.embedder.url` | `http://127.0.0.1:11434/v1` (`HYBRID_SEARCH_EMBEDDING_URL`) | Basis-URL einer OpenAI-kompatiblen API |
 | `vector.embedder.model` | `bge-m3` (`HYBRID_SEARCH_EMBEDDING_MODEL`) | |
 | `vector.embedder.key` | null (`HYBRID_SEARCH_EMBEDDING_KEY`) | wird als Bearer-Token gesendet |
 | `vector.embedder.batch`, `vector.embedder.timeout` | 32, 60 | Texte pro Anfrage, Sekunden pro Anfrage |
+| `vector.embedder.query_prefix`, `vector.embedder.document_prefix` | leer (`HYBRID_SEARCH_QUERY_PREFIX`, `HYBRID_SEARCH_DOCUMENT_PREFIX`) | vor Anfrage und Chunk beim Einbetten: `query: ` und `passage: ` für e5; bge-m3 und OpenAI brauchen keins. Ein neues Dokumentpräfix bettet die Chunks neu ein |
 
 ## Der Index
 
@@ -111,7 +113,7 @@ ganze Dokument noch einmal.
 `SearchQuery::hybrid()` bettet die Anfrage einmal ein und nimmt die besten
 `candidates` der Volltextsuche sowie die besten `candidates` Dokumente nach
 der Kosinusdistanz ihres nächstgelegenen Chunks; dann werden beide Listen per
-Reciprocal Rank Fusion zusammengeführt: score = Σ 1 / (`rrf_k` + rank). Ein
+Reciprocal Rank Fusion zusammengeführt: score = Σ w / (`rrf_k` + rank), mit `w` aus `vector.weights`. Ein
 exakter Schlüssel addiert 10 und steht daher weiterhin an erster Stelle.
 `Hit` behält seine Form: `score` ist der fusionierte Wert; das Snippet ist das
 hervorgehobene Volltextfragment oder, für ein allein über die Bedeutung

@@ -22,3 +22,9 @@ it('breaks ties by first appearance and ignores repeats', function (): void {
     expect(array_keys(ReciprocalRankFusion::fuse([['a', 'b'], ['b', 'a']])))->toBe(['a', 'b'])
         ->and(ReciprocalRankFusion::fuse([['a', 'a', 'b']], 0))->toBe(['a' => 1.0, 'b' => 0.5]);
 });
+
+it('weighs the rankings', function (): void {
+    // 1 leads the first list, 2 the second; a heavier second list puts 2 first.
+    expect(array_key_first(ReciprocalRankFusion::fuse([[1, 2], [2, 1]], 60, [1.0, 1.5])))->toBe(2)
+        ->and(ReciprocalRankFusion::fuse([['a']], 0, [0.5]))->toBe(['a' => 0.5]);
+});

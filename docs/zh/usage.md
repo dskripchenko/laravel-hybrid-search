@@ -18,11 +18,13 @@
 | `vector.candidates` | 50 | 融合前每一侧取出的候选数量 |
 | `vector.rrf_k` | 60 | Reciprocal Rank Fusion 的 k 值 |
 | `vector.max_distance` | null | 丢弃余弦距离超过该值的向量候选 |
+| `vector.weights.text`、`vector.weights.meaning` | 1、1（`HYBRID_SEARCH_WEIGHT_TEXT`、`HYBRID_SEARCH_WEIGHT_MEANING`） | 融合时两个排名列表各自的权重 |
 | `vector.iterative_scan` | `relaxed_order` | pgvector 0.8+ 的迭代索引扫描；较旧的 pgvector 请设为 null |
 | `vector.embedder.url` | `http://127.0.0.1:11434/v1`（`HYBRID_SEARCH_EMBEDDING_URL`） | OpenAI 兼容 API 的基础地址 |
 | `vector.embedder.model` | `bge-m3`（`HYBRID_SEARCH_EMBEDDING_MODEL`） | |
 | `vector.embedder.key` | null（`HYBRID_SEARCH_EMBEDDING_KEY`） | 作为 bearer 令牌发送 |
 | `vector.embedder.batch`、`vector.embedder.timeout` | 32、60 | 每个请求的文本数、每个请求的超时秒数 |
+| `vector.embedder.query_prefix`、`vector.embedder.document_prefix` | 空（`HYBRID_SEARCH_QUERY_PREFIX`、`HYBRID_SEARCH_DOCUMENT_PREFIX`） | 向量化时加在查询和文本块前：e5 使用 `query: ` 和 `passage: `；bge-m3 和 OpenAI 模型不需要。更换文档前缀会重新向量化所有文本块 |
 
 ## 索引
 
@@ -96,7 +98,7 @@ $this->app->singleton(Embedder::class, MyEmbedder::class);
 
 `SearchQuery::hybrid()` 对查询只做一次嵌入，取全文搜索的前 `candidates` 条
 结果，以及按其最近块的余弦距离排序的前 `candidates` 个文档，然后用
-Reciprocal Rank Fusion 融合两个列表：score = Σ 1 / (`rrf_k` + rank)。
+Reciprocal Rank Fusion 融合两个列表：score = Σ w / (`rrf_k` + rank)，其中 `w` 来自 `vector.weights`。
 键完全匹配加 10 分，因此仍然排在首位。`Hit` 的结构保持不变：`score` 是融合
 后的分数；摘要是高亮的全文片段，对于仅凭语义找到的文档，则是其最佳块的前
 `snippet.max_words` 个词。`limit()` 和偏移量在融合后的列表内分页。

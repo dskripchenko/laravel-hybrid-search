@@ -6,6 +6,13 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- `vector.weights` (`text`, `meaning`): the weight of each ranking in the
+  rank fusion; `ReciprocalRankFusion::fuse()` takes weights.
+- `vector.embedder.query_prefix` and `document_prefix` for models trained
+  with prefixes (e5). The document prefix is part of a chunk's hash, so a new
+  one embeds the chunks again.
+
 ## [0.1.0] — 2026-10-27
 
 First public release.

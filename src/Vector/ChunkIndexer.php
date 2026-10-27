@@ -30,7 +30,9 @@ final class ChunkIndexer
     {
         $chunks = (new MarkdownChunker(VectorConfig::chunkChars(), VectorConfig::chunkOverlap()))->chunk($title, $body);
         $model = $this->embedder->model();
-        $hashes = array_map(static fn (Chunk $chunk): string => hash('sha256', $model."\0".$chunk->text), $chunks);
+        // The prefix is part of what is embedded: changing it embeds again.
+        $prefix = VectorConfig::documentPrefix();
+        $hashes = array_map(static fn (Chunk $chunk): string => hash('sha256', $model."\0".$prefix.$chunk->text), $chunks);
 
         $db = $this->db();
         $table = VectorConfig::table();
@@ -53,7 +55,7 @@ final class ChunkIndexer
         $missing = [];
         foreach ($chunks as $n => $chunk) {
             if (! isset($reusable[$hashes[$n]])) {
-                $missing[$hashes[$n]] = $chunk->text;
+                $missing[$hashes[$n]] = $prefix.$chunk->text;
             }
         }
         $vectors = $missing === [] ? [] : array_combine(array_keys($missing), $this->embed(array_values($missing)));
