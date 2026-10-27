@@ -108,13 +108,38 @@ $query->degraded();                              // null, or why it ran on full-
 
 The package depends on no LLM client: bind your own
 `Dskripchenko\HybridSearch\Contracts\Embedder` to use anything else, and
-`Embedders\FakeEmbedder` in tests. More in [docs/en](docs/en/usage.md).
+`Embedders\FakeEmbedder` in tests.
+
+## Documentation
+
+Configuration, the index, ranking, chunking, embedders, hybrid ranking,
+access and multi-tenant hosts: [English](docs/en/usage.md) ·
+[Русский](docs/ru/usage.md) · [Deutsch](docs/de/usage.md) ·
+[中文](docs/zh/usage.md).
 
 ## Requirements
 
-PHP 8.2–8.5, Laravel 11–13, PostgreSQL; pgvector 0.8+ for the vector half
-(0.5+ with `vector.iterative_scan` set to null).
+PHP 8.2–8.5 with `pdo_pgsql`, Laravel 11–13 (Laravel 13 needs PHP 8.3+),
+PostgreSQL 13+; pgvector 0.8+ for the vector half (0.5+ with
+`vector.iterative_scan` set to null).
+
+## Testing
+
+The suite needs PostgreSQL (and pgvector for the vector tests); it skips
+what it cannot reach. Point it at a database with `HYBRID_SEARCH_TEST_DB_HOST`,
+`_PORT`, `_DATABASE`, `_USERNAME`, `_PASSWORD` (defaults: `127.0.0.1:5432`,
+`hybrid_search_test`, `postgres`):
+
+```bash
+composer test      # Pest
+composer analyse   # PHPStan, level max
+composer format    # Pint
+```
+
+## Security
+
+See [SECURITY.md](SECURITY.md) for how to report a vulnerability.
 
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE).
