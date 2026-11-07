@@ -379,9 +379,29 @@ final class SearchQuery
     /** @return array{0: string, 1: list<string>} */
     private function queries(string $text): array
     {
-        $words = preg_split('/[^\p{L}\p{N}]+/u', mb_strtolower($text), -1, PREG_SPLIT_NO_EMPTY) ?: [];
-        $words = array_slice($words, 0, 8);
-        $prefix = implode(' & ', array_map(static fn (string $w): string => $w.':*', $words));
+        // The prefix half reads the words the way websearch_to_tsquery does: a
+        // "-" at the start of a word excludes it (a hyphen inside "GAL-12" does
+        // not), "or" is an operator. Excluded words stay excluded here too —
+        // OR-ed with the websearch half, a prefix query that ignored them would
+        // bring back exactly what the minus left out.
+        $positive = [];
+        $negative = [];
+        preg_match_all('/(?<![\p{L}\p{N}])(-?)([\p{L}\p{N}]+)/u', mb_strtolower($text), $matches, PREG_SET_ORDER);
+        foreach ($matches as $match) {
+            if ($match[2] === 'or') {
+                continue;
+            }
+            if ($match[1] === '-') {
+                $negative[] = $match[2];
+            } else {
+                $positive[] = $match[2];
+            }
+        }
+        $positive = array_slice($positive, 0, 8);
+        $prefix = $positive === [] ? '' : implode(' & ', [
+            ...array_map(static fn (string $w): string => $w.':*', $positive),
+            ...array_map(static fn (string $w): string => '!'.$w, array_slice($negative, 0, 8)),
+        ]);
 
         $web = implode(' || ', array_map(static fn (string $c): string => "websearch_to_tsquery('{$c}', ?)", self::CONFIGS));
         $pre = $prefix === ''

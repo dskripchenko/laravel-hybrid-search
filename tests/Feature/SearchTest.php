@@ -24,6 +24,15 @@ it('finds by word forms in the document language', function (): void {
         ->and(keys(Search::query('planned sprint')->accessKeys(['project:1'])->get()))->toBe(['N-2']);
 });
 
+it('leaves out what the query excludes with a minus, prefixes included', function (): void {
+    // "sprint" is in N-2 only; "-board" must drop it although "board" is a prefix of "boards".
+    expect(keys(Search::query('sprint -board')->accessKeys(['project:1'])->get()))->toBe([])
+        ->and(keys(Search::query('sprint -arendator')->accessKeys(['project:1'])->get()))->toBe(['N-2'])
+        ->and(keys(Search::query('арендатор -postgresql')->accessKeys(['project:1'])->get()))->toBe([])
+        // Only an exclusion: everything without the word, as websearch_to_tsquery reads it.
+        ->and(keys(Search::query('-board')->accessKeys(['project:1'])->get()))->toBe(['N-1']);
+});
+
 it('finds by the beginning of a word while typing', function (): void {
     expect(keys(Search::query('swim')->accessKeys(['project:1'])->get()))->toBe(['N-2']);
 });
