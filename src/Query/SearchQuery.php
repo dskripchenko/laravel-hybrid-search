@@ -23,7 +23,7 @@ use Throwable;
  * The text is matched as typed (websearch syntax: "quotes", -minus, or) and
  * as prefixes of its words, in the russian, english and simple
  * configurations at once, so a constant query keeps the GIN index in use
- * whatever the language of a document. An exact key (GAL-12) ranks first.
+ * whatever the language of a document. An exact key (KB-12) ranks first.
  *
  * hybrid() adds the vector side: the text is embedded once, the top
  * candidates of full-text and of cosine distance over chunks — both under the
@@ -385,7 +385,7 @@ final class SearchQuery
     private function queries(string $text): array
     {
         // The prefix half reads the words the way websearch_to_tsquery does: a
-        // "-" at the start of a word excludes it (a hyphen inside "GAL-12" does
+        // "-" at the start of a word excludes it (a hyphen inside "KB-12" does
         // not), "or" is an operator. Excluded words stay excluded here too —
         // OR-ed with the websearch half, a prefix query that ignored them would
         // bring back exactly what the minus left out.

@@ -135,8 +135,8 @@ und `degraded()` sagt das.
 
 Jedes Dokument trägt einen Zugriffsschlüssel; eine Abfrage übergibt die
 Schlüssel der fragenden Person. Bilden Sie die Schlüssel aus Ihrem eigenen
-Berechtigungsmodell — für einen Tracker `project:<id>` für jedes Projekt, das
-die Person sehen darf. Der Filter ist Teil der WHERE-Klausel und wird vor
+Berechtigungsmodell — für eine Wissensdatenbank `team:<id>` für jedes Team,
+dessen Artikel die Person lesen darf. Der Filter ist Teil der WHERE-Klausel und wird vor
 Ranking und Limitierung angewendet, nie danach — auch auf der Vektorseite:
 Chunks werden mit ihren Dokumenten verbunden und innerhalb der
 Nächste-Nachbarn-Suche nach denselben Zugriffs-, Typ- und Facettenbedingungen

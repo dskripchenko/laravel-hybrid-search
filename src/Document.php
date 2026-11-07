@@ -6,7 +6,7 @@ namespace Dskripchenko\HybridSearch;
 
 /**
  * What the index keeps of a record. `accessKey` names the scope that may see
- * it (`project:12`, `space:4`); `facets` are filterable values; `language` is
+ * it (`team:12`, `group:4`); `facets` are filterable values; `language` is
  * a PostgreSQL text search configuration (russian, english, simple, …).
  */
 final readonly class Document

@@ -15,9 +15,9 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [0.2.0] — 2026-11-07
 
 ### Fixed
-- A word excluded with a minus (`sprint -board`) came back through the prefix
+- A word excluded with a minus (`refund -card`) came back through the prefix
   half of the query, which took every word as a prefix to match. The prefix
-  half now excludes those words too; a hyphen inside a word (`GAL-12`) is not
+  half now excludes those words too; a hyphen inside a word (`KB-12`) is not
   a minus.
 
 ### Added

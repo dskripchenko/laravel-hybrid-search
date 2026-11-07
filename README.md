@@ -26,23 +26,23 @@ use Dskripchenko\HybridSearch\Concerns\IndexedForSearch;
 use Dskripchenko\HybridSearch\Contracts\Searchable;
 use Dskripchenko\HybridSearch\Document;
 
-final class Issue extends Model implements Searchable
+final class Article extends Model implements Searchable
 {
     use IndexedForSearch;            // saved → indexed, deleted → removed
 
-    public function searchType(): string { return 'issue'; }
+    public function searchType(): string { return 'article'; }
     public function searchKey(): string { return $this->key; }
 
     public function toSearchDocument(): Document
     {
         return new Document(
-            type: 'issue',
+            type: 'article',
             key: $this->key,
             title: $this->title,
-            body: (string) $this->description,
-            accessKey: 'project:'.$this->project_id,   // who may see it
-            facets: ['project' => $this->project_id, 'status' => $this->status],
-            url: '/issues/'.$this->key,
+            body: (string) $this->body,
+            accessKey: 'team:'.$this->team_id,          // who may see it
+            facets: ['team' => $this->team_id, 'status' => $this->status],
+            url: '/articles/'.$this->key,
             language: 'russian',                        // a text search configuration
         );
     }
@@ -57,21 +57,21 @@ transaction that changed the record commits.
 ```php
 use Dskripchenko\HybridSearch\Facades\Search;
 
-$hits = Search::query('доска спринт')
-    ->accessKeys(['project:12', 'project:15'])   // required: or ->everywhere()
-    ->types('issue', 'page')
-    ->where('status', 'open')
+$hits = Search::query('возврат заказа')
+    ->accessKeys(['team:12', 'team:15'])         // required: or ->everywhere()
+    ->types('article', 'faq')
+    ->where('status', 'published')
     ->limit(20)
     ->get();                                     // list<Hit>: type, key, title, snippet, url, score, facets
 
-Search::query('доска')->accessKeys($keys)->countsByType();   // ['issue' => 7, 'page' => 2]
+Search::query('возврат')->accessKeys($keys)->countsByType();   // ['article' => 7, 'faq' => 2]
 ```
 
 - The text is read as typed (websearch syntax: `"phrases"`, `-minus`, `or`)
   and as prefixes of its words, in the russian, english and simple
   configurations at once — one constant query, so the GIN index is used
   whatever language a document is in.
-- An exact key (`GAL-12`) ranks first.
+- An exact key (`KB-12`) ranks first.
 - **Access fails closed**: a query without `accessKeys()` throws, an empty
   key list finds nothing, only `everywhere()` lifts the filter.
 

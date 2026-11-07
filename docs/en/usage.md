@@ -122,8 +122,8 @@ is reported to the application's exception handler. With vector search off,
 ## Access
 
 Every document carries one access key; a query passes the keys of the person
-asking. Build the keys from your own permission model — for a tracker,
-`project:<id>` for every project the person may browse. The filter is part of
+asking. Build the keys from your own permission model — for a knowledge base,
+`team:<id>` for every team whose articles the person may read. The filter is part of
 the WHERE clause, applied before ranking and limiting, never afterwards — on
 the vector side as well: chunks are joined to their documents and filtered by
 the same access, type and facet conditions inside the nearest-neighbour scan
