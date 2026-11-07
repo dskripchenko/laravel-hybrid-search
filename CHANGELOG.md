@@ -6,6 +6,8 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-11-07
+
 ### Fixed
 - A word excluded with a minus (`sprint -board`) came back through the prefix
   half of the query, which took every word as a prefix to match. The prefix
