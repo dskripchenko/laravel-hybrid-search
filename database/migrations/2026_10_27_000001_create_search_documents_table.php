@@ -19,7 +19,7 @@ return new class extends Migration
 
         // Text search lowercases through the database's LC_CTYPE. A database
         // created with LC_CTYPE=C leaves non-Latin words in their capitals,
-        // and "Статьи" never matches "статья" — silently. Refuse instead.
+        // and a non-Latin word in capitals never matches its lower case — silently. Refuse instead.
         $row = DB::selectOne("select to_tsvector('simple', 'ДЁ') = to_tsvector('simple', 'дё') as ok, (select datctype from pg_database where datname = current_database()) as ctype");
         if (! is_object($row) || ! property_exists($row, 'ok') || $row->ok !== true) {
             $ctype = is_object($row) && property_exists($row, 'ctype') && is_string($row->ctype) ? $row->ctype : '?';

@@ -43,7 +43,7 @@ final class Article extends Model implements Searchable
             accessKey: 'team:'.$this->team_id,          // who may see it
             facets: ['team' => $this->team_id, 'status' => $this->status],
             url: '/articles/'.$this->key,
-            language: 'russian',                        // a text search configuration
+            language: 'english',                        // a text search configuration
         );
     }
 }
@@ -57,14 +57,14 @@ transaction that changed the record commits.
 ```php
 use Dskripchenko\HybridSearch\Facades\Search;
 
-$hits = Search::query('возврат заказа')
+$hits = Search::query('order refund')
     ->accessKeys(['team:12', 'team:15'])         // required: or ->everywhere()
     ->types('article', 'faq')
     ->where('status', 'published')
     ->limit(20)
     ->get();                                     // list<Hit>: type, key, title, snippet, url, score, facets
 
-Search::query('возврат')->accessKeys($keys)->countsByType();   // ['article' => 7, 'faq' => 2]
+Search::query('refund')->accessKeys($keys)->countsByType();   // ['article' => 7, 'faq' => 2]
 ```
 
 - The text is read as typed (websearch syntax: `"phrases"`, `-minus`, `or`)
