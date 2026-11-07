@@ -217,8 +217,11 @@ final class SearchQuery
         $maxDistance = VectorConfig::maxDistance();
         $cutoff = $maxDistance === null ? '' : 'where best.distance <= ?';
         $db = $this->db();
+        // Taken out of the transaction by reference: transaction() returns
+        // mixed in the type stubs of Laravel 11 and 12.
+        $found = [];
 
-        return $db->transaction(static function () use ($db, $vector, $where, $whereBindings, $table, $chunks, $chunkLimit, $limit, $maxDistance, $cutoff): array {
+        $db->transaction(static function () use ($db, $vector, $where, $whereBindings, $table, $chunks, $chunkLimit, $limit, $maxDistance, $cutoff, &$found): void {
             $scan = VectorConfig::iterativeScan();
             if ($scan !== null) {
                 $db->select("select set_config('hnsw.iterative_scan', ?, true)", [$scan]);
@@ -244,8 +247,10 @@ final class SearchQuery
                 [$vector, ...$whereBindings, $vector, $chunkLimit, ...($maxDistance === null ? [] : [$maxDistance]), $limit],
             );
 
-            return self::rows($rows);
+            $found = self::rows($rows);
         });
+
+        return $found;
     }
 
     /** @return list<Hit> */

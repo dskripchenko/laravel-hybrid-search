@@ -6,6 +6,12 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.1] — 2026-11-07
+
+### Fixed
+- PHPStan on Laravel 11 and 12: `transaction()` returns `mixed` in their type
+  stubs, so the vector query's result is taken out by reference.
+
 ## [0.2.0] — 2026-11-07
 
 ### Fixed
