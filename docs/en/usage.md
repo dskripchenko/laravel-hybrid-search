@@ -32,7 +32,8 @@
 One row per document: `type`, `key` (unique together), `title`, `body`,
 `access_key`, `facets` (jsonb), `url`, `language` (regconfig) and a generated
 `tsv` — title weighted A, body B. Indexes: GIN on `tsv`, B-tree on
-`(access_key, type)`, GIN on `facets`.
+`(access_key, type)`, GIN on `facets`, B-tree on `lower(key)` (the exact-key
+match is OR-ed with full-text; without it PostgreSQL reads the whole table).
 
 ## Counts
 
@@ -41,6 +42,45 @@ filter, ignoring `types()`. `countsBy('status')` counts them per value of a
 facet under every filter but the one on that facet, so the values of a facet
 keep their counts while one is chosen; documents without the facet are not
 counted.
+
+## Filters and order
+
+```php
+Search::query('release')->accessKeys($keys)
+    ->whereIn('room', [1, 3])          // any of these values
+    ->whereBetween('at', $from, null)  // a numeric facet within bounds; null leaves a side open
+    ->whereContains('tags', 'red')     // a list facet holds the value
+    ->orderByFacet('at')               // a numeric facet instead of relevance (desc by default)
+    ->get();
+```
+
+`orderByNewest()` orders by the order documents entered the index (the
+primary key, newest first): for records indexed as they are written —
+messages, events — that is their time, and an index walk finds the first
+page at once. When the host knows the query matches little (from a capped
+count), `orderByNewest(fewMatches: true)` sorts the matches instead: walking
+from the newest end would read far for matches that are rare or absent.
+
+## Large indexes
+
+A broad word may match hundreds of thousands of documents; these keep its
+cost bounded:
+
+- `counts(['room', 'author'], upTo: 1000)` — the total and the counts of
+  several facets in one pass; counting stops after `upTo` matches.
+  `countsByType()` and `countsBy()` take `upTo` too. A total equal to
+  `upTo` means "at least".
+- `candidates(1000)` — rank only the newest 1000 matches.
+- `withinNewest(1000000)` — look only among the newest documents of the
+  index: a range of the primary key the planner combines with the other
+  indexes, and one part of the table every query shares, so it stays in
+  memory. Widen it (drop it) when it holds too little.
+
+A host can count first (bounded), then choose: few matches — rank them all
+or sort them; many — `candidates()` or an index walk. On a 10-million-document
+index this keeps a search under a second at the 95th percentile on modest
+hardware, with PostgreSQL given memory and cheap random reads
+(`shared_buffers`, `random_page_cost = 1.1` on SSD, `jit = off`).
 
 ## Ranking
 

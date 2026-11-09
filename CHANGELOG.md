@@ -6,6 +6,21 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-11-09
+
+### Added
+- Filters: `whereIn()`, `whereBetween()` (numeric facets), `whereContains()`
+  (list facets); `Document::$facets` may hold lists.
+- Order: `orderByFacet()`; `orderByNewest()` by the order documents entered
+  the index, with `fewMatches` to sort instead of walking the index.
+- Bounded cost on large indexes: `counts()` (the total and several facets in
+  one pass), `upTo` on `countsByType()` and `countsBy()`, `candidates()`,
+  `withinNewest()`.
+
+### Fixed
+- A B-tree index on `lower(key)` (new migration): the exact-key match OR-ed
+  with full-text made PostgreSQL read the whole table.
+
 ## [0.3.0] — 2026-11-09
 
 ### Added
