@@ -76,3 +76,22 @@ it('treats the query as data, not syntax', function (): void {
     expect(Search::query("'); drop table notes; --")->everywhere()->get())->toBe([])
         ->and(Search::query('арендатор & | ! :*')->accessKeys(['project:1'])->get())->toHaveCount(1);
 });
+
+it('counts by the values of a facet, leaving out its own filter but keeping the others', function (): void {
+    Note::query()->create(['title' => 'Planning a sprint', 'body' => 'Sprints of the second project.', 'scope' => 'project:1', 'lang' => 'english', 'status' => 'open']);
+    Note::query()->create(['title' => 'Hidden sprints', 'body' => 'Not for project one.', 'scope' => 'project:2', 'lang' => 'english', 'status' => 'open']);
+
+    expect(Search::query('sprints')->accessKeys(['project:1'])->countsBy('status'))->toEqualCanonicalizing(['done' => 1, 'open' => 1])
+        // A chosen value keeps the counts of the others.
+        ->and(Search::query('sprints')->accessKeys(['project:1'])->where('status', 'done')->countsBy('status'))->toEqualCanonicalizing(['done' => 1, 'open' => 1])
+        ->and(Search::query('sprints')->accessKeys(['project:1'])->types('page')->countsBy('status'))->toBe([])
+        ->and(Search::query('sprints')->everywhere()->countsBy('status'))->toEqualCanonicalizing(['done' => 1, 'open' => 2])
+        ->and(Search::query('sprints')->accessKeys(['project:1'])->countsBy('missing'))->toBe([])
+        ->and(Search::query('sprints')->accessKeys([])->countsBy('status'))->toBe([])
+        ->and(fn () => Search::query('sprints')->countsBy('status'))->toThrow(LogicException::class);
+});
+
+it('marks no full-text hit as found by meaning', function (): void {
+    expect(Search::query('арендатор')->accessKeys(['project:1'])->get()[0]->byMeaning)->toBeFalse()
+        ->and(Search::query('арендатор')->accessKeys(['project:1'])->hybrid()->get()[0]->byMeaning)->toBeFalse();
+});

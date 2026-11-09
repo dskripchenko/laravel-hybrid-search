@@ -20,6 +20,7 @@
 | `vector.max_distance` | null | 丢弃余弦距离超过该值的向量候选 |
 | `vector.weights.text`、`vector.weights.meaning` | 1、1（`HYBRID_SEARCH_WEIGHT_TEXT`、`HYBRID_SEARCH_WEIGHT_MEANING`） | 融合时两个排名列表各自的权重 |
 | `vector.iterative_scan` | `relaxed_order` | pgvector 0.8+ 的迭代索引扫描；较旧的 pgvector 请设为 null |
+| `vector.embedder.class` | null（`HYBRID_SEARCH_EMBEDDER`） | 实现 `Contracts\Embedder` 的类，从容器中解析；null 表示使用下面的 OpenAI 兼容客户端 |
 | `vector.embedder.url` | `http://127.0.0.1:11434/v1`（`HYBRID_SEARCH_EMBEDDING_URL`） | OpenAI 兼容 API 的基础地址 |
 | `vector.embedder.model` | `bge-m3`（`HYBRID_SEARCH_EMBEDDING_MODEL`） | |
 | `vector.embedder.key` | null（`HYBRID_SEARCH_EMBEDDING_KEY`） | 作为 bearer 令牌发送 |
@@ -32,6 +33,12 @@
 `access_key`、`facets`（jsonb）、`url`、`language`（regconfig）以及一个生成列
 `tsv` —— 标题权重为 A，正文权重为 B。索引：`tsv` 上的 GIN 索引，
 `(access_key, type)` 上的 B-tree 索引，`facets` 上的 GIN 索引。
+
+## 计数
+
+`countsByType()` 在访问和分面过滤下按类型统计匹配数，忽略 `types()`。
+`countsBy('status')` 按分面的取值统计，应用除该分面自身过滤之外的所有过滤，
+因此选中某个取值时其他取值仍保留计数；没有该分面的文档不计入。
 
 ## 排序
 
@@ -72,7 +79,8 @@ interface Embedder
 
 `Embedders\OpenAiCompatibleEmbedder` 将 `{model, input: [...]}` 分批发送到
 `{url}/embeddings`，并按 `index` 对返回结果重新排序 —— 适用于 OpenAI、
-Ollama 的 `/v1`、vLLM、LocalAI。要替换它，请绑定你自己的实现：
+Ollama 的 `/v1`、vLLM、LocalAI。要替换它，可在 `vector.embedder.class` 中指定
+你自己的实现（由容器创建，构造函数可注入所需依赖），或自行绑定：
 
 ```php
 $this->app->singleton(Embedder::class, MyEmbedder::class);
@@ -102,7 +110,9 @@ Reciprocal Rank Fusion 融合两个列表：score = Σ w / (`rrf_k` + rank)，�
 键完全匹配加 10 分，因此仍然排在首位。`Hit` 的结构保持不变：`score` 是融合
 后的分数；摘要是高亮的全文片段，对于仅凭语义找到的文档，则是其最佳块的前
 `snippet.max_words` 个词。`limit()` 和偏移量在融合后的列表内分页。
-`countsByType()` 仍只基于全文搜索。
+`countsByType()` 和 `countsBy()` 仍只基于全文搜索。仅凭语义找到的文档
+（其最近块在向量候选中，而没有任何词匹配）的 `Hit::$byMeaning` 为 true，
+界面可以据此说明它为何出现在结果中。
 
 最近邻总是存在的：如果不设置 `max_distance`，混合查询也会返回与问题“最不
 远”的文档，无论它们实际上有多远。

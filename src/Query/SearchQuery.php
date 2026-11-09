@@ -170,6 +170,48 @@ final class SearchQuery
     }
 
     /**
+     * How many matches per value of a facet (`['north' => 4, 'south' => 1]`),
+     * for facets in the interface. A filter on the same facet is left out,
+     * so every value keeps its count while one is chosen; the other filters
+     * stay. Documents without the facet are not counted.
+     *
+     * @return array<string, int>
+     */
+    public function countsBy(string $facet): array
+    {
+        if ($this->accessKeys === null) {
+            throw new LogicException('A search needs accessKeys() or an explicit everywhere().');
+        }
+        $text = trim($this->text);
+        if ($text === '' || ($this->accessKeys === [] && ! $this->unrestricted())) {
+            return [];
+        }
+
+        [$cte, $bindings] = $this->queries($text);
+        $facets = $this->facets;
+        unset($this->facets[$facet]);
+        [$where, $whereBindings] = $this->conditions();
+        $this->facets = $facets;
+        $table = $this->table();
+
+        $out = [];
+        foreach ($this->db()->select(
+            "with {$cte} select d.facets ->> ? as value, count(*) as total from {$table} d, q
+             where (d.tsv @@ q.web or d.tsv @@ q.pre or lower(d.key) = lower(?)) {$where}
+               and d.facets ->> ? is not null
+             group by 1",
+            [...$bindings, $facet, $text, ...$whereBindings, $facet],
+        ) as $row) {
+            $r = (array) $row;
+            if (is_string($r['value'] ?? null)) {
+                $out[$r['value']] = is_numeric($r['total'] ?? null) ? (int) $r['total'] : 0;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
      * Full-text matches, best first.
      *
      * @return list<array<string, mixed>>
@@ -279,6 +321,7 @@ final class SearchQuery
             $byMeaning[] = $id;
             if (! isset($rows[$id])) {
                 $row['snippet'] = $this->trim(is_string($row['content'] ?? null) ? $row['content'] : '');
+                $row['by_meaning'] = true;
                 $rows[$id] = $row;
             }
         }
@@ -343,6 +386,7 @@ final class SearchQuery
             url: is_string($r['url'] ?? null) ? $r['url'] : null,
             score: is_numeric($r['score'] ?? null) ? (float) $r['score'] : 0.0,
             facets: $facets,
+            byMeaning: ($r['by_meaning'] ?? false) === true,
         );
     }
 
