@@ -70,6 +70,9 @@ begrenzen die Kosten:
   mehrerer Facetten in einem Durchgang; gezählt wird bis `upTo` Treffer.
   `countsByType()` und `countsBy()` nehmen ebenfalls `upTo`. Eine Gesamtzahl
   gleich `upTo` bedeutet „mindestens“.
+- `prefixes(false)` — Wörter ganz (in ihren Formen) statt nach ihrem Anfang
+  suchen: ein Präfix durchläuft weit mehr vom GIN-Index. Präfixe bleiben für
+  ein Feld, das während der Eingabe sucht.
 - `candidates(1000)` — nur die 1000 neuesten Treffer ranken.
 - `withinNewest(1000000)` — nur unter den neuesten Dokumenten des Index
   suchen: ein Bereich des Primärschlüssels, den der Planer mit den anderen
