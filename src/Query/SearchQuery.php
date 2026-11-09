@@ -62,6 +62,8 @@ final class SearchQuery
 
     private ?int $newestDocuments = null;
 
+    private bool $prefixes = true;
+
     private bool $everywhere = false;
 
     private bool $hybrid = false;
@@ -173,6 +175,19 @@ final class SearchQuery
     public function candidates(int $n): self
     {
         $this->candidates = max(1, $n);
+
+        return $this;
+    }
+
+    /**
+     * Match the beginnings of words too (the default) — for a field that
+     * searches while one types. Off, words are matched whole (in their
+     * forms), which costs much less on a large index: a prefix walks far
+     * more of the GIN index than a word.
+     */
+    public function prefixes(bool $on = true): self
+    {
+        $this->prefixes = $on;
 
         return $this;
     }
@@ -634,7 +649,7 @@ final class SearchQuery
             }
         }
         $positive = array_slice($positive, 0, 8);
-        $prefix = $positive === [] ? '' : implode(' & ', [
+        $prefix = $positive === [] || ! $this->prefixes ? '' : implode(' & ', [
             ...array_map(static fn (string $w): string => $w.':*', $positive),
             ...array_map(static fn (string $w): string => '!'.$w, array_slice($negative, 0, 8)),
         ]);

@@ -70,6 +70,9 @@ cost bounded:
   several facets in one pass; counting stops after `upTo` matches.
   `countsByType()` and `countsBy()` take `upTo` too. A total equal to
   `upTo` means "at least".
+- `prefixes(false)` — match words whole (in their forms), not their
+  beginnings: a prefix walks far more of the GIN index. Keep prefixes for
+  a field that searches while one types.
 - `candidates(1000)` — rank only the newest 1000 matches.
 - `withinNewest(1000000)` — look only among the newest documents of the
   index: a range of the primary key the planner combines with the other

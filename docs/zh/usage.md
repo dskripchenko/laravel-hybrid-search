@@ -58,6 +58,7 @@ Search::query('release')->accessKeys($keys)
 宽泛的词可能匹配数十万文档；以下方法限制其成本：
 
 - `counts(['room', 'author'], upTo: 1000)` —— 一次遍历得到总数与多个 facet 的计数；计到 `upTo` 个匹配即停止。`countsByType()` 与 `countsBy()` 同样接受 `upTo`。总数等于 `upTo` 表示“至少”。
+- `prefixes(false)` —— 按完整词（及其词形）匹配，而非词首：前缀会遍历多得多的 GIN 索引。对于边输入边搜索的输入框保留前缀。
 - `candidates(1000)` —— 只对最新的 1000 个匹配排序。
 - `withinNewest(1000000)` —— 只在索引中最新的文档里查找：这是主键的一个范围，规划器会将其与其他索引组合；它也是所有查询共享的表的一部分，因此常驻内存。匹配过少时放宽（去掉）它。
 

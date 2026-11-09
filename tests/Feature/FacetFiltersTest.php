@@ -93,3 +93,9 @@ it('looks among the newest documents of the index only', function (): void {
         ->and(Search::query('release')->accessKeys(['team:1'])->withinNewest(2)->counts(['room'])['total'])->toBe(2)
         ->and(Search::query('release')->accessKeys(['team:1'])->withinNewest(100)->counts([])['total'])->toBe(4);
 });
+
+it('matches beginnings of words unless told not to', function (): void {
+    expect(found(Search::query('relea')->accessKeys(['team:1'])->orderByNewest()->get()))->toHaveCount(4)
+        ->and(Search::query('relea')->accessKeys(['team:1'])->prefixes(false)->get())->toBe([])
+        ->and(found(Search::query('releases')->accessKeys(['team:1'])->prefixes(false)->orderByNewest()->get()))->toHaveCount(4);
+});
