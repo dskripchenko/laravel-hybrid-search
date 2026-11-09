@@ -71,9 +71,11 @@ return [
         'iterative_scan' => 'relaxed_order',
 
         // The built-in embedder: any OpenAI-compatible /embeddings endpoint
-        // (OpenAI, Ollama's /v1, vLLM, LocalAI…). Bind your own
-        // Contracts\Embedder in the container to replace it.
+        // (OpenAI, Ollama's /v1, vLLM, LocalAI…). Name a class implementing
+        // Contracts\Embedder in `class` (resolved from the container), or bind
+        // one in the container, to replace it.
         'embedder' => [
+            'class' => env('HYBRID_SEARCH_EMBEDDER'),
             'url' => env('HYBRID_SEARCH_EMBEDDING_URL', 'http://127.0.0.1:11434/v1'),
             'model' => env('HYBRID_SEARCH_EMBEDDING_MODEL', 'bge-m3'),
             'key' => env('HYBRID_SEARCH_EMBEDDING_KEY'),

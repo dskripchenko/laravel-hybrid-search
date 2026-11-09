@@ -33,7 +33,8 @@ it('finds by meaning what full-text cannot find by words', function (): void {
         ->and($hits[0]->snippet)->toBe('Every customer lives in a separate schema of PostgreSQL.')
         ->and($hits[0]->title)->toBe('Customer data')
         ->and($hits[0]->url)->toBe('/notes/1')
-        ->and($hits[0]->facets)->toBe(['status' => 'open']);
+        ->and($hits[0]->facets)->toBe(['status' => 'open'])
+        ->and($hits[0]->byMeaning)->toBeTrue();
 });
 
 it('ranks first what both full-text and vectors agree on', function (): void {
@@ -44,7 +45,10 @@ it('ranks first what both full-text and vectors agree on', function (): void {
         ->and($hits[0]->score)->toEqualWithDelta(2 / 61, 1e-9)
         ->and($hits[0]->snippet)->toContain('**')
         ->and(hitKeys($hits))->toEqualCanonicalizing(['N-1', 'N-2', 'N-4'])
-        ->and($hits[1]->score)->toBeLessThan($hits[0]->score);
+        ->and($hits[1]->score)->toBeLessThan($hits[0]->score)
+        // Matched by its words, it is not marked; the others came by meaning alone.
+        ->and($hits[0]->byMeaning)->toBeFalse()
+        ->and(array_map(fn (Hit $h) => $h->byMeaning, array_slice($hits, 1)))->toBe([true, true]);
 });
 
 it('still ranks an exact key first', function (): void {

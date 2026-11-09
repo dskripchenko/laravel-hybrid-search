@@ -20,6 +20,7 @@
 | `vector.max_distance` | null | drop vector candidates farther than this cosine distance |
 | `vector.weights.text`, `vector.weights.meaning` | 1, 1 (`HYBRID_SEARCH_WEIGHT_TEXT`, `HYBRID_SEARCH_WEIGHT_MEANING`) | how much each ranking counts in the fusion |
 | `vector.iterative_scan` | `relaxed_order` | pgvector 0.8+ iterative index scans; null on older pgvector |
+| `vector.embedder.class` | null (`HYBRID_SEARCH_EMBEDDER`) | a class implementing `Contracts\Embedder`, resolved from the container; null — the OpenAI-compatible client below |
 | `vector.embedder.url` | `http://127.0.0.1:11434/v1` (`HYBRID_SEARCH_EMBEDDING_URL`) | an OpenAI-compatible API base |
 | `vector.embedder.model` | `bge-m3` (`HYBRID_SEARCH_EMBEDDING_MODEL`) | |
 | `vector.embedder.key` | null (`HYBRID_SEARCH_EMBEDDING_KEY`) | sent as a bearer token |
@@ -32,6 +33,14 @@ One row per document: `type`, `key` (unique together), `title`, `body`,
 `access_key`, `facets` (jsonb), `url`, `language` (regconfig) and a generated
 `tsv` — title weighted A, body B. Indexes: GIN on `tsv`, B-tree on
 `(access_key, type)`, GIN on `facets`.
+
+## Counts
+
+`countsByType()` counts the matches per type under the access and facet
+filter, ignoring `types()`. `countsBy('status')` counts them per value of a
+facet under every filter but the one on that facet, so the values of a facet
+keep their counts while one is chosen; documents without the facet are not
+counted.
 
 ## Ranking
 
@@ -75,7 +84,9 @@ interface Embedder
 
 `Embedders\OpenAiCompatibleEmbedder` posts `{model, input: [...]}` to
 `{url}/embeddings` in batches and reorders the answer by `index` — OpenAI,
-Ollama's `/v1`, vLLM, LocalAI. Bind your own implementation to replace it:
+Ollama's `/v1`, vLLM, LocalAI. Name your own implementation in
+`vector.embedder.class` to replace it — it is made by the container, so its
+constructor may take what it needs — or bind it yourself:
 
 ```php
 $this->app->singleton(Embedder::class, MyEmbedder::class);
@@ -109,7 +120,10 @@ score = Σ w / (`rrf_k` + rank), with `w` from `vector.weights`. An exact key ad
 `Hit` keeps its shape: `score` is the fused score; the snippet is the
 highlighted full-text fragment, or for a document found by meaning alone the
 first `snippet.max_words` words of its best chunk. `limit()` and the offset
-page within the fused list. `countsByType()` stays full-text.
+page within the fused list. `countsByType()` and `countsBy()` stay full-text.
+`Hit::$byMeaning` is true for a document found by meaning alone — its nearest
+chunk was among the vector candidates and none of its words matched — so an
+interface can say why it is there.
 
 Nearest neighbours always exist: without `max_distance` a hybrid query also
 returns the documents least far from the question, however far that is.

@@ -6,6 +6,17 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-11-09
+
+### Added
+- `Hit::$byMeaning`: true for a document a hybrid query found by meaning
+  alone, none of its words matching.
+- `SearchQuery::countsBy($facet)`: matches per value of a facet, under every
+  filter but the one on that facet.
+- `vector.embedder.class` (`HYBRID_SEARCH_EMBEDDER`): the embedder named by
+  class, made by the container; the OpenAI-compatible client stays the
+  default.
+
 ## [0.2.1] — 2026-11-07
 
 ### Fixed

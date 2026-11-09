@@ -20,6 +20,7 @@
 | `vector.max_distance` | null | Vektorkandidaten jenseits dieser Kosinusdistanz verwerfen |
 | `vector.weights.text`, `vector.weights.meaning` | 1, 1 (`HYBRID_SEARCH_WEIGHT_TEXT`, `HYBRID_SEARCH_WEIGHT_MEANING`) | wie stark jede der beiden Ranglisten in die Fusion eingeht |
 | `vector.iterative_scan` | `relaxed_order` | iterative Index-Scans von pgvector 0.8+; null bei älterem pgvector |
+| `vector.embedder.class` | null (`HYBRID_SEARCH_EMBEDDER`) | eine Klasse, die `Contracts\Embedder` implementiert, aus dem Container aufgelöst; null — der OpenAI-kompatible Client unten |
 | `vector.embedder.url` | `http://127.0.0.1:11434/v1` (`HYBRID_SEARCH_EMBEDDING_URL`) | Basis-URL einer OpenAI-kompatiblen API |
 | `vector.embedder.model` | `bge-m3` (`HYBRID_SEARCH_EMBEDDING_MODEL`) | |
 | `vector.embedder.key` | null (`HYBRID_SEARCH_EMBEDDING_KEY`) | wird als Bearer-Token gesendet |
@@ -32,6 +33,14 @@ Eine Zeile pro Dokument: `type`, `key` (gemeinsam eindeutig), `title`, `body`,
 `access_key`, `facets` (jsonb), `url`, `language` (regconfig) und ein
 generiertes `tsv` — Titel mit Gewicht A, Text mit Gewicht B. Indizes: GIN auf
 `tsv`, B-Tree auf `(access_key, type)`, GIN auf `facets`.
+
+## Zählungen
+
+`countsByType()` zählt die Treffer je Typ unter dem Zugriffs- und
+Facettenfilter und ignoriert `types()`. `countsBy('status')` zählt sie je
+Wert einer Facette unter allen Filtern außer dem auf diese Facette, sodass die
+Werte ihre Zählung behalten, während einer gewählt ist; Dokumente ohne die
+Facette werden nicht gezählt.
 
 ## Ranking
 
@@ -79,8 +88,9 @@ interface Embedder
 
 `Embedders\OpenAiCompatibleEmbedder` sendet `{model, input: [...]}` in Stapeln
 an `{url}/embeddings` und ordnet die Antwort nach `index` — OpenAI, Ollamas
-`/v1`, vLLM, LocalAI. Binden Sie eine eigene Implementierung, um ihn zu
-ersetzen:
+`/v1`, vLLM, LocalAI. Um ihn zu ersetzen, nennen Sie Ihre eigene
+Implementierung in `vector.embedder.class` — der Container erzeugt sie, ihr
+Konstruktor darf also nehmen, was er braucht — oder binden Sie sie selbst:
 
 ```php
 $this->app->singleton(Embedder::class, MyEmbedder::class);
@@ -119,7 +129,10 @@ exakter Schlüssel addiert 10 und steht daher weiterhin an erster Stelle.
 hervorgehobene Volltextfragment oder, für ein allein über die Bedeutung
 gefundenes Dokument, die ersten `snippet.max_words` Wörter seines besten
 Chunks. `limit()` und der Offset blättern innerhalb der fusionierten Liste.
-`countsByType()` bleibt reine Volltextsuche.
+`countsByType()` und `countsBy()` bleiben reine Volltextsuche.
+`Hit::$byMeaning` ist true für ein allein über die Bedeutung gefundenes
+Dokument — sein nächster Chunk war unter den Vektorkandidaten, keines seiner
+Wörter passte —, damit eine Oberfläche sagen kann, warum es auftaucht.
 
 Nächste Nachbarn gibt es immer: Ohne `max_distance` liefert eine hybride
 Abfrage auch die Dokumente, die der Frage am wenigsten fern sind — wie fern

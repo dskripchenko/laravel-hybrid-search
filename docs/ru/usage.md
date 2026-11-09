@@ -20,6 +20,7 @@
 | `vector.max_distance` | null | отбрасывать векторных кандидатов дальше этого косинусного расстояния |
 | `vector.weights.text`, `vector.weights.meaning` | 1, 1 (`HYBRID_SEARCH_WEIGHT_TEXT`, `HYBRID_SEARCH_WEIGHT_MEANING`) | вес каждого из двух списков при слиянии |
 | `vector.iterative_scan` | `relaxed_order` | итеративное сканирование индекса pgvector 0.8+; null на более старом pgvector |
+| `vector.embedder.class` | null (`HYBRID_SEARCH_EMBEDDER`) | класс, реализующий `Contracts\Embedder`, берётся из контейнера; null — OpenAI-совместимый клиент ниже |
 | `vector.embedder.url` | `http://127.0.0.1:11434/v1` (`HYBRID_SEARCH_EMBEDDING_URL`) | базовый адрес OpenAI-совместимого API |
 | `vector.embedder.model` | `bge-m3` (`HYBRID_SEARCH_EMBEDDING_MODEL`) | |
 | `vector.embedder.key` | null (`HYBRID_SEARCH_EMBEDDING_KEY`) | отправляется как bearer-токен |
@@ -32,6 +33,13 @@
 `access_key`, `facets` (jsonb), `url`, `language` (regconfig) и генерируемый
 `tsv` — заголовок с весом A, тело с весом B. Индексы: GIN по `tsv`, B-tree по
 `(access_key, type)`, GIN по `facets`.
+
+## Счётчики
+
+`countsByType()` считает совпадения по типам под фильтром доступа и фасетов,
+не глядя на `types()`. `countsBy('status')` считает их по значениям фасета под
+всеми фильтрами, кроме фильтра по этому же фасету, — значения сохраняют свои
+счётчики, пока одно из них выбрано; документы без фасета не считаются.
 
 ## Ранжирование
 
@@ -77,7 +85,9 @@ interface Embedder
 
 `Embedders\OpenAiCompatibleEmbedder` отправляет `{model, input: [...]}` на
 `{url}/embeddings` пачками и упорядочивает ответ по `index` — OpenAI,
-`/v1` у Ollama, vLLM, LocalAI. Чтобы заменить его, привяжите свою реализацию:
+`/v1` у Ollama, vLLM, LocalAI. Чтобы заменить его, назовите свою реализацию в
+`vector.embedder.class` — её создаёт контейнер, так что конструктор может
+принимать нужное, — или привяжите её сами:
 
 ```php
 $this->app->singleton(Embedder::class, MyEmbedder::class);
@@ -114,7 +124,10 @@ $this->app->singleton(Embedder::class, MyEmbedder::class);
 `Hit` сохраняет свою форму: `score` — слитый балл; сниппет — подсвеченный
 полнотекстовый фрагмент, а для документа, найденного только по смыслу, —
 первые `snippet.max_words` слов его лучшего чанка. `limit()` и смещение
-листают внутри слитого списка. `countsByType()` остаётся полнотекстовым.
+листают внутри слитого списка. `countsByType()` и `countsBy()` остаются
+полнотекстовыми. `Hit::$byMeaning` — true у документа, найденного только по
+смыслу: его ближайший чанк попал в векторных кандидатов, а ни одно слово не
+совпало, — так интерфейс может объяснить, почему он в результатах.
 
 Ближайшие соседи существуют всегда: без `max_distance` гибридный запрос
 вернёт и документы, наименее далёкие от вопроса, как бы далеко они ни были.

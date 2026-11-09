@@ -62,9 +62,10 @@ $hits = Search::query('order refund')
     ->types('article', 'faq')
     ->where('status', 'published')
     ->limit(20)
-    ->get();                                     // list<Hit>: type, key, title, snippet, url, score, facets
+    ->get();                                     // list<Hit>: type, key, title, snippet, url, score, facets, byMeaning
 
 Search::query('refund')->accessKeys($keys)->countsByType();   // ['article' => 7, 'faq' => 2]
+Search::query('refund')->accessKeys($keys)->countsBy('status'); // ['published' => 6, 'draft' => 3]
 ```
 
 - The text is read as typed (websearch syntax: `"phrases"`, `-minus`, `or`)
