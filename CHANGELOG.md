@@ -6,6 +6,11 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.2] — 2026-11-09
+
+### Fixed
+- Snippets highlight the matched words with `prefixes(false)` too.
+
 ## [0.4.1] — 2026-11-09
 
 ### Added

@@ -99,3 +99,9 @@ it('matches beginnings of words unless told not to', function (): void {
         ->and(Search::query('relea')->accessKeys(['team:1'])->prefixes(false)->get())->toBe([])
         ->and(found(Search::query('releases')->accessKeys(['team:1'])->prefixes(false)->orderByNewest()->get()))->toHaveCount(4);
 });
+
+it('highlights the matched words with prefixes off too', function (): void {
+    $hits = Search::query('checklist')->accessKeys(['team:1'])->prefixes(false)->get();
+
+    expect($hits[0]->snippet)->toContain('**checklist**');
+});
