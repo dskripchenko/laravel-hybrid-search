@@ -430,7 +430,7 @@ final class SearchQuery
         $rows = $this->db()->select(
             "with {$cte}
              select d.id, d.type, d.key, d.title, d.url, d.facets,
-                    ts_headline(d.language, d.body, q.pre, '{$snippet}') as snippet,
+                    ts_headline(d.language, d.body, q.web || q.pre, '{$snippet}') as snippet,
                     ts_rank_cd(d.tsv, q.web) * 2 + ts_rank_cd(d.tsv, q.pre)
                       + case when lower(d.key) = lower(?) then 10 else 0 end as score,
                     lower(d.key) = lower(?) as exact
