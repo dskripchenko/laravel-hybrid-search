@@ -11,7 +11,7 @@ namespace Dskripchenko\HybridSearch;
  */
 final readonly class Document
 {
-    /** @param array<string, string|int|float|bool|null> $facets */
+    /** @param array<string, string|int|float|bool|null|list<string|int|float|bool>> $facets a list is matched by whereContains() */
     public function __construct(
         public string $type,
         public string $key,

@@ -42,6 +42,47 @@ Wert einer Facette unter allen Filtern außer dem auf diese Facette, sodass die
 Werte ihre Zählung behalten, während einer gewählt ist; Dokumente ohne die
 Facette werden nicht gezählt.
 
+## Filter und Reihenfolge
+
+```php
+Search::query('release')->accessKeys($keys)
+    ->whereIn('room', [1, 3])          // einer dieser Werte
+    ->whereBetween('at', $from, null)  // numerische Facette in Grenzen; null lässt eine Seite offen
+    ->whereContains('tags', 'red')     // eine Listen-Facette enthält den Wert
+    ->orderByFacet('at')               // numerische Facette statt Relevanz (absteigend)
+    ->get();
+```
+
+`orderByNewest()` ordnet nach der Reihenfolge, in der Dokumente in den Index
+kamen (Primärschlüssel, neueste zuerst): Für Datensätze, die beim Schreiben
+indexiert werden — Nachrichten, Ereignisse —, ist das ihre Zeit, und ein
+Indexdurchlauf findet die erste Seite sofort. Weiß der Host, dass die Suche
+wenig trifft (aus einer gedeckelten Zählung), sortiert
+`orderByNewest(fewMatches: true)` die Treffer stattdessen: Ein Durchlauf vom
+neuesten Ende läse weit für seltene oder fehlende Treffer.
+
+## Große Indizes
+
+Ein breites Wort kann Hunderttausende Dokumente treffen; diese Werkzeuge
+begrenzen die Kosten:
+
+- `counts(['room', 'author'], upTo: 1000)` — Gesamtzahl und Zählungen
+  mehrerer Facetten in einem Durchgang; gezählt wird bis `upTo` Treffer.
+  `countsByType()` und `countsBy()` nehmen ebenfalls `upTo`. Eine Gesamtzahl
+  gleich `upTo` bedeutet „mindestens“.
+- `candidates(1000)` — nur die 1000 neuesten Treffer ranken.
+- `withinNewest(1000000)` — nur unter den neuesten Dokumenten des Index
+  suchen: ein Bereich des Primärschlüssels, den der Planer mit den anderen
+  Indizes kombiniert, und ein Teil der Tabelle, den alle Abfragen teilen —
+  er bleibt im Speicher. Erweitern (weglassen), wenn er zu wenig enthält.
+
+Ein Host kann zuerst (gedeckelt) zählen und dann wählen: wenige Treffer —
+alle ranken oder sortieren; viele — `candidates()` oder ein Indexdurchlauf.
+Auf einem Index mit 10 Millionen Dokumenten hält das die Suche im
+95. Perzentil unter einer Sekunde auf bescheidener Hardware, wenn PostgreSQL
+Speicher und günstige zufällige Lesezugriffe bekommt (`shared_buffers`,
+`random_page_cost = 1.1` auf SSD, `jit = off`).
+
 ## Ranking
 
 `ts_rank_cd` der websearch-Abfrage zählt doppelt, die der Präfixabfrage

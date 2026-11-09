@@ -40,6 +40,29 @@
 `countsBy('status')` 按分面的取值统计，应用除该分面自身过滤之外的所有过滤，
 因此选中某个取值时其他取值仍保留计数；没有该分面的文档不计入。
 
+## 过滤与排序
+
+```php
+Search::query('release')->accessKeys($keys)
+    ->whereIn('room', [1, 3])          // 任一取值
+    ->whereBetween('at', $from, null)  // 数值 facet 在区间内；null 表示该侧不限
+    ->whereContains('tags', 'red')     // 列表 facet 包含该值
+    ->orderByFacet('at')               // 按数值 facet 而非相关性排序（默认降序）
+    ->get();
+```
+
+`orderByNewest()` 按文档进入索引的顺序（主键，最新在前）排序：对写入即索引的记录——消息、事件——这就是它们的时间，沿索引遍历即可立即得到第一页。若宿主（通过有上限的计数）得知匹配很少，`orderByNewest(fewMatches: true)` 改为对匹配结果排序：从最新端遍历会为稀少或不存在的匹配读取很远。
+
+## 大型索引
+
+宽泛的词可能匹配数十万文档；以下方法限制其成本：
+
+- `counts(['room', 'author'], upTo: 1000)` —— 一次遍历得到总数与多个 facet 的计数；计到 `upTo` 个匹配即停止。`countsByType()` 与 `countsBy()` 同样接受 `upTo`。总数等于 `upTo` 表示“至少”。
+- `candidates(1000)` —— 只对最新的 1000 个匹配排序。
+- `withinNewest(1000000)` —— 只在索引中最新的文档里查找：这是主键的一个范围，规划器会将其与其他索引组合；它也是所有查询共享的表的一部分，因此常驻内存。匹配过少时放宽（去掉）它。
+
+宿主可以先（有上限地）计数，再选择：匹配少——全部排序或排名；匹配多——`candidates()` 或索引遍历。在 1000 万文档的索引上，只要为 PostgreSQL 提供内存与低成本随机读（`shared_buffers`、SSD 上 `random_page_cost = 1.1`、`jit = off`），即使在普通硬件上，搜索的 P95 也能低于一秒。
+
 ## 排序
 
 websearch 查询的 `ts_rank_cd` 计两次，前缀查询的计一次；键完全匹配加 10 分。
